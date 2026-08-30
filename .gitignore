@@ -1,0 +1,9 @@
+.ipynb_checkpoints/
+.venv/
+venv/
+__pycache__/
+.idea/
+.vscode/
+*.pyc
+.DS_Store
+Thumbs.db
