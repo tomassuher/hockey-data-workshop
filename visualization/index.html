@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beach Viz — 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --sand: #e8d4b0;
+      --sand-deep: #c9a66b;
+      --sea: #2bb8c9;
+      --sea-deep: #0a6e8a;
+      --sky: #7ec8e8;
+      --ink: #1a2a32;
+      --foam: rgba(255, 255, 255, 0.82);
+      --accent: #f0a05a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: "Outfit", sans-serif;
+      color: var(--ink);
+      background: #0b3d4d;
+    }
+
+    #app {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hud {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .brand {
+      position: absolute;
+      top: clamp(1rem, 3vw, 2rem);
+      left: clamp(1rem, 3vw, 2rem);
+      max-width: min(22rem, 70vw);
+    }
+
+    .brand h1 {
+      font-family: "Fraunces", serif;
+      font-weight: 700;
+      font-size: clamp(1.8rem, 4.5vw, 3rem);
+      line-height: 1.05;
+      color: #fff;
+      text-shadow: 0 2px 24px rgba(10, 40, 55, 0.45);
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin-top: 0.55rem;
+      font-weight: 300;
+      font-size: clamp(0.9rem, 1.6vw, 1.05rem);
+      color: var(--foam);
+      max-width: 18rem;
+      line-height: 1.45;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: clamp(1rem, 3vw, 2rem);
+      left: clamp(1rem, 3vw, 2rem);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      pointer-events: auto;
+    }
+
+    .controls button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(15, 45, 58, 0.45);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .controls button:hover {
+      background: rgba(15, 45, 58, 0.7);
+      border-color: rgba(255, 255, 255, 0.55);
+      transform: translateY(-1px);
+    }
+
+    .controls button.active {
+      background: rgba(240, 160, 90, 0.9);
+      border-color: transparent;
+      color: #1a2a32;
+    }
+
+    .hint {
+      position: absolute;
+      bottom: clamp(1rem, 3vw, 2rem);
+      right: clamp(1rem, 3vw, 2rem);
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.75);
+      background: rgba(15, 45, 58, 0.35);
+      backdrop-filter: blur(8px);
+      padding: 0.55rem 0.85rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .refs {
+      position: absolute;
+      top: clamp(1rem, 3vw, 2rem);
+      right: clamp(1rem, 3vw, 2rem);
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      pointer-events: auto;
+      max-height: 55vh;
+      overflow: auto;
+      padding: 0.35rem;
+      scrollbar-width: thin;
+    }
+
+    .refs img {
+      width: clamp(4.5rem, 10vw, 6.5rem);
+      height: clamp(6rem, 13vw, 8.5rem);
+      object-fit: cover;
+      border-radius: 0.65rem;
+      border: 2px solid rgba(255, 255, 255, 0.55);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      cursor: pointer;
+      opacity: 0.85;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .refs img:hover,
+    .refs img.active {
+      opacity: 1;
+      transform: scale(1.04);
+      border-color: var(--accent);
+    }
+
+    @media (max-width: 640px) {
+      .refs {
+        flex-direction: row;
+        top: auto;
+        bottom: 4.5rem;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        max-height: none;
+        max-width: 92vw;
+      }
+
+      .refs img {
+        width: 3.6rem;
+        height: 4.8rem;
+      }
+
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="hud">
+      <div class="brand">
+        <h1>Beach Viz</h1>
+        <p>Stylizovaný 3D model podle tvých fotek. Otáčej, přibližuj, přepínej pózy.</p>
+      </div>
+      <div class="refs" id="refs" aria-label="Referenční fotky"></div>
+      <div class="controls">
+        <button type="button" data-pose="stand" class="active">Stoj</button>
+        <button type="button" data-pose="look">Výhled</button>
+        <button type="button" data-pose="sit">Sed</button>
+        <button type="button" id="autoRotate">Auto-otáčení</button>
+        <button type="button" id="resetCam">Reset kamery</button>
+      </div>
+      <div class="hint">Tažením otáčej · kolečkem zoom</div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./scene.js"></script>
+</body>
+</html>
