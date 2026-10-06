@@ -1,490 +1,468 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const skinTone = 0xd4a574;
-const hairTone = 0xc9a66b;
-const bikiniTone = 0x7ec8e3;
-const sandTone = 0xe6d2a8;
+/* Palette from reference photos */
+const SKIN = 0xe0b892;
+const SKIN_SHADOW = 0xc9956e;
+const HAIR = 0xd4b06a;
+const HAIR_LIGHT = 0xe8c98a;
+const BIKINI = 0x8fd4e8;
+const SAND = 0xe8d4b0;
+const SEA = 0x2bb8c9;
 
 const app = document.getElementById("app");
 const refsEl = document.getElementById("refs");
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x7ec8e8, 0.012);
+scene.background = new THREE.Color(0x7ec8e8);
+scene.fog = new THREE.FogExp2(0x7ec8e8, 0.014);
 
-const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(2.4, 1.55, 4.2);
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0.35, 1.45, 4.4);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.05, 0);
+controls.target.set(0, 1.1, 0);
 controls.enableDamping = true;
-controls.minDistance = 1.8;
-controls.maxDistance = 9;
-controls.maxPolarAngle = Math.PI * 0.49;
-controls.minPolarAngle = 0.15;
+controls.minDistance = 1.6;
+controls.maxDistance = 10;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minPolarAngle = 0.12;
 controls.autoRotate = false;
-controls.autoRotateSpeed = 0.7;
+controls.autoRotateSpeed = 0.65;
 
-// --- Sky / environment ---
-scene.background = new THREE.Color(0x87ccea);
+/* Lights */
+scene.add(new THREE.HemisphereLight(0xbde8ff, 0xd8c09a, 0.9));
 
-const hemi = new THREE.HemisphereLight(0xb8e4ff, 0xd4b896, 0.85);
-scene.add(hemi);
-
-const sun = new THREE.DirectionalLight(0xfff0d8, 1.55);
-sun.position.set(6, 10, 4);
+const sun = new THREE.DirectionalLight(0xfff2dc, 1.6);
+sun.position.set(5.5, 9.5, 5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 30;
-sun.shadow.camera.left = -8;
-sun.shadow.camera.right = 8;
-sun.shadow.camera.top = 8;
-sun.shadow.camera.bottom = -8;
-sun.shadow.bias = -0.0002;
+Object.assign(sun.shadow.camera, { near: 1, far: 30, left: -8, right: 8, top: 8, bottom: -8 });
+sun.shadow.bias = -0.00025;
 scene.add(sun);
 
-const fill = new THREE.DirectionalLight(0x9ad7ea, 0.35);
-fill.position.set(-4, 3, -2);
+const fill = new THREE.DirectionalLight(0x9ad4ea, 0.4);
+fill.position.set(-5, 3, -3);
 scene.add(fill);
 
-// Sand
-const sandGeo = new THREE.CircleGeometry(28, 64);
-const sandMat = new THREE.MeshStandardMaterial({
-  color: sandTone,
-  roughness: 0.95,
-  metalness: 0.02,
-});
-const sand = new THREE.Mesh(sandGeo, sandMat);
+const rim = new THREE.DirectionalLight(0xffe0b0, 0.35);
+rim.position.set(-2, 4, -6);
+scene.add(rim);
+
+/* Beach */
+const sand = new THREE.Mesh(
+  new THREE.CircleGeometry(30, 72),
+  new THREE.MeshStandardMaterial({ color: SAND, roughness: 0.96, metalness: 0.02 })
+);
 sand.rotation.x = -Math.PI / 2;
 sand.receiveShadow = true;
 scene.add(sand);
 
-// Wet sand strip near water
-const wetGeo = new THREE.RingGeometry(5.5, 9.5, 64, 1, 0, Math.PI);
-const wetMat = new THREE.MeshStandardMaterial({
-  color: 0xc4b089,
-  roughness: 0.55,
-  metalness: 0.05,
-});
-const wet = new THREE.Mesh(wetGeo, wetMat);
+const wet = new THREE.Mesh(
+  new THREE.RingGeometry(6, 11, 72, 1, Math.PI * 0.15, Math.PI * 0.7),
+  new THREE.MeshStandardMaterial({ color: 0xc4ae82, roughness: 0.5, metalness: 0.08 })
+);
 wet.rotation.x = -Math.PI / 2;
-wet.position.y = 0.005;
-wet.position.z = -2;
+wet.position.set(0, 0.008, -3);
 wet.receiveShadow = true;
 scene.add(wet);
 
-// Ocean
-const waterGeo = new THREE.PlaneGeometry(60, 40, 64, 32);
-const waterPos = waterGeo.attributes.position;
-for (let i = 0; i < waterPos.count; i++) {
-  const x = waterPos.getX(i);
-  const y = waterPos.getY(i);
-  waterPos.setZ(i, Math.sin(x * 0.35) * 0.04 + Math.cos(y * 0.25) * 0.03);
-}
-waterGeo.computeVertexNormals();
-const waterMat = new THREE.MeshStandardMaterial({
-  color: 0x2ab8c8,
-  roughness: 0.2,
-  metalness: 0.35,
-  transparent: true,
-  opacity: 0.92,
-});
-const water = new THREE.Mesh(waterGeo, waterMat);
+const waterGeo = new THREE.PlaneGeometry(70, 48, 80, 40);
+const water = new THREE.Mesh(
+  waterGeo,
+  new THREE.MeshStandardMaterial({
+    color: SEA,
+    roughness: 0.18,
+    metalness: 0.4,
+    transparent: true,
+    opacity: 0.9,
+  })
+);
 water.rotation.x = -Math.PI / 2;
-water.position.set(0, 0.02, -22);
+water.position.set(0, 0.03, -24);
 water.receiveShadow = true;
 scene.add(water);
 
-// Horizon hills / coast
-const coastShape = new THREE.Shape();
-coastShape.moveTo(-20, 0);
-coastShape.lineTo(-18, 0.6);
-coastShape.lineTo(-14, 1.1);
-coastShape.lineTo(-10, 0.7);
-coastShape.lineTo(-6, 1.4);
-coastShape.lineTo(-2, 0.9);
-coastShape.lineTo(2, 1.2);
-coastShape.lineTo(6, 0.55);
-coastShape.lineTo(10, 1.0);
-coastShape.lineTo(14, 0.45);
-coastShape.lineTo(20, 0.8);
-coastShape.lineTo(20, 0);
-coastShape.closePath();
-const coastGeo = new THREE.ExtrudeGeometry(coastShape, { depth: 2, bevelEnabled: false });
-const coastMat = new THREE.MeshStandardMaterial({ color: 0xc9b08a, roughness: 0.9 });
-const coast = new THREE.Mesh(coastGeo, coastMat);
-coast.position.set(0, 0, -38);
-coast.rotation.x = 0;
+/* Distant coast */
+const coastPts = [];
+for (let i = 0; i <= 24; i++) {
+  const x = -22 + i * 1.85;
+  const y = 0.4 + Math.abs(Math.sin(i * 0.7)) * 0.9 + (i % 3) * 0.15;
+  coastPts.push(new THREE.Vector2(x, y));
+}
+coastPts.push(new THREE.Vector2(24, 0), new THREE.Vector2(-22, 0));
+const coastShape = new THREE.Shape(coastPts);
+const coast = new THREE.Mesh(
+  new THREE.ExtrudeGeometry(coastShape, { depth: 3, bevelEnabled: false }),
+  new THREE.MeshStandardMaterial({ color: 0xcbb08a, roughness: 0.92 })
+);
+coast.position.set(0, 0, -40);
 scene.add(coast);
 
-// Soft ground shadow disc under character
 const shadowDisc = new THREE.Mesh(
-  new THREE.CircleGeometry(0.55, 32),
-  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 })
+  new THREE.CircleGeometry(0.5, 32),
+  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16 })
 );
 shadowDisc.rotation.x = -Math.PI / 2;
-shadowDisc.position.y = 0.01;
+shadowDisc.position.y = 0.012;
 scene.add(shadowDisc);
 
-// --- Character ---
-const character = new THREE.Group();
-character.position.set(0, 0, 0);
-scene.add(character);
-
-const skinMat = new THREE.MeshStandardMaterial({
-  color: skinTone,
-  roughness: 0.55,
-  metalness: 0.05,
-});
-const hairMat = new THREE.MeshStandardMaterial({
-  color: hairTone,
-  roughness: 0.65,
-  metalness: 0.08,
-});
-const bikiniMat = new THREE.MeshStandardMaterial({
-  color: bikiniTone,
-  roughness: 0.35,
-  metalness: 0.25,
-});
+/* Materials */
+const skinMat = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.52, metalness: 0.04 });
+const skinDeep = new THREE.MeshStandardMaterial({ color: SKIN_SHADOW, roughness: 0.58, metalness: 0.04 });
+const hairMat = new THREE.MeshStandardMaterial({ color: HAIR, roughness: 0.62, metalness: 0.06 });
+const hairLite = new THREE.MeshStandardMaterial({ color: HAIR_LIGHT, roughness: 0.55, metalness: 0.08 });
+const bikiniMat = new THREE.MeshStandardMaterial({ color: BIKINI, roughness: 0.32, metalness: 0.28 });
 const sparkleMat = new THREE.MeshStandardMaterial({
   color: 0xffffff,
-  roughness: 0.15,
-  metalness: 0.9,
-  emissive: 0xaadfff,
-  emissiveIntensity: 0.15,
+  roughness: 0.12,
+  metalness: 0.95,
+  emissive: 0xb8e8ff,
+  emissiveIntensity: 0.2,
 });
+const eyeWhite = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.4 });
+const irisMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.25 });
+const lipMat = new THREE.MeshStandardMaterial({ color: 0xc97870, roughness: 0.4 });
 
-function limb(radiusTop, radiusBottom, height, radial = 10) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radial),
-    skinMat
-  );
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+function mesh(geo, mat) {
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
 }
 
-function ball(r, mat = skinMat, segs = 18) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, segs, segs), mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
+function sphere(r, mat = skinMat, w = 20, h = 16) {
+  return mesh(new THREE.SphereGeometry(r, w, h), mat);
 }
 
-// Hips / pelvis
+function cyl(rt, rb, h, mat = skinMat, seg = 12) {
+  return mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+}
+
+/* ===== Character ===== */
+const character = new THREE.Group();
+scene.add(character);
+
 const hips = new THREE.Group();
-hips.position.y = 0.92;
+hips.position.y = 0.95;
 character.add(hips);
 
-const pelvis = ball(0.16);
-pelvis.scale.set(1.35, 0.85, 1.05);
+const pelvis = sphere(0.15);
+pelvis.scale.set(1.45, 0.9, 1.1);
 hips.add(pelvis);
 
-// Torso
+/* Torso */
 const torso = new THREE.Group();
-torso.position.y = 0.22;
+torso.position.y = 0.2;
 hips.add(torso);
 
-const chest = new THREE.Mesh(
-  new THREE.CapsuleGeometry(0.15, 0.28, 6, 12),
-  skinMat
-);
-chest.scale.set(1.25, 1, 0.85);
-chest.castShadow = true;
-torso.add(chest);
+const ribcage = mesh(new THREE.CapsuleGeometry(0.14, 0.26, 8, 14), skinMat);
+ribcage.scale.set(1.35, 1.05, 0.88);
+torso.add(ribcage);
 
-const waist = ball(0.13);
-waist.position.y = -0.12;
-waist.scale.set(1.15, 0.7, 0.9);
-torso.add(waist);
+const abdomen = sphere(0.12, skinDeep);
+abdomen.position.y = -0.1;
+abdomen.scale.set(1.2, 0.75, 0.95);
+torso.add(abdomen);
 
-// Bust for bikini shape
-const bustL = ball(0.075);
-bustL.position.set(-0.08, 0.12, 0.08);
-bustL.scale.set(1, 0.9, 0.85);
+/* Bust */
+const bustL = sphere(0.078);
+bustL.position.set(-0.09, 0.14, 0.09);
+bustL.scale.set(1.05, 0.95, 0.9);
 torso.add(bustL);
 const bustR = bustL.clone();
-bustR.position.x = 0.08;
+bustR.position.x = 0.09;
 torso.add(bustR);
 
-// Bikini top
-const topL = ball(0.078, bikiniMat);
-topL.position.copy(bustL.position);
-topL.position.z += 0.01;
-topL.scale.set(1.05, 0.95, 0.7);
-torso.add(topL);
-const topR = topL.clone();
-topR.position.x = 0.08;
-torso.add(topR);
+/* Bikini top — triangle cups */
+function triangleCup(side) {
+  const g = new THREE.Group();
+  const cup = sphere(0.082, bikiniMat);
+  cup.scale.set(1.1, 1.0, 0.55);
+  cup.position.set(side * 0.09, 0.14, 0.11);
+  g.add(cup);
+  /* side tie nub */
+  const nub = sphere(0.02, bikiniMat, 8, 8);
+  nub.position.set(side * 0.15, 0.12, 0.06);
+  g.add(nub);
+  return g;
+}
+torso.add(triangleCup(-1), triangleCup(1));
 
-// Neck straps
-const strapGeo = new THREE.TubeGeometry(
-  new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.08, 0.14, 0.06),
-    new THREE.Vector3(-0.04, 0.28, 0.02),
-    new THREE.Vector3(0, 0.34, -0.02),
-    new THREE.Vector3(0.04, 0.28, 0.02),
-    new THREE.Vector3(0.08, 0.14, 0.06),
-  ]),
-  20,
-  0.008,
-  6,
-  false
-);
-const straps = new THREE.Mesh(strapGeo, bikiniMat);
-straps.castShadow = true;
-torso.add(straps);
+/* neck strap */
+const strapCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-0.09, 0.16, 0.1),
+  new THREE.Vector3(-0.05, 0.3, 0.04),
+  new THREE.Vector3(0, 0.38, -0.01),
+  new THREE.Vector3(0.05, 0.3, 0.04),
+  new THREE.Vector3(0.09, 0.16, 0.1),
+]);
+torso.add(mesh(new THREE.TubeGeometry(strapCurve, 24, 0.007, 6, false), bikiniMat));
 
-// Sparkles on top
-for (let i = 0; i < 14; i++) {
-  const s = ball(0.008 + Math.random() * 0.006, sparkleMat, 6);
+/* back strap */
+const backStrap = mesh(new THREE.TorusGeometry(0.14, 0.007, 6, 24, Math.PI), bikiniMat);
+backStrap.position.set(0, 0.12, -0.05);
+backStrap.rotation.x = Math.PI / 2;
+backStrap.rotation.z = Math.PI;
+torso.add(backStrap);
+
+/* sparkles */
+const sparkles = [];
+for (let i = 0; i < 18; i++) {
+  const s = sphere(0.006 + Math.random() * 0.007, sparkleMat, 6, 6);
   const side = i % 2 === 0 ? -1 : 1;
-  s.position.set(side * (0.05 + Math.random() * 0.05), 0.1 + Math.random() * 0.08, 0.12 + Math.random() * 0.02);
+  s.position.set(
+    side * (0.05 + Math.random() * 0.06),
+    0.1 + Math.random() * 0.1,
+    0.14 + Math.random() * 0.02
+  );
   torso.add(s);
+  sparkles.push(s);
 }
 
-// Bikini bottom
+/* Bikini bottoms */
 const bottoms = new THREE.Group();
 bottoms.position.y = -0.02;
 hips.add(bottoms);
-const bottomFront = ball(0.12, bikiniMat);
-bottomFront.scale.set(1.2, 0.55, 0.7);
-bottomFront.position.set(0, 0, 0.02);
-bottoms.add(bottomFront);
-const bottomBack = ball(0.11, bikiniMat);
-bottomBack.scale.set(1.15, 0.5, 0.65);
-bottomBack.position.set(0, 0, -0.04);
-bottoms.add(bottomBack);
 
-// Side ties
+const frontPanel = sphere(0.115, bikiniMat);
+frontPanel.scale.set(1.25, 0.55, 0.65);
+frontPanel.position.set(0, 0.01, 0.04);
+bottoms.add(frontPanel);
+
+const backPanel = sphere(0.11, bikiniMat);
+backPanel.scale.set(1.2, 0.5, 0.6);
+backPanel.position.set(0, 0.01, -0.05);
+bottoms.add(backPanel);
+
 [-1, 1].forEach((side) => {
-  const tie = new THREE.Mesh(
-    new THREE.TorusGeometry(0.04, 0.008, 6, 16),
-    bikiniMat
-  );
-  tie.position.set(side * 0.14, 0.02, 0);
-  tie.rotation.y = Math.PI / 2;
-  bottoms.add(tie);
+  const hipTie = mesh(new THREE.TorusGeometry(0.035, 0.007, 6, 14), bikiniMat);
+  hipTie.position.set(side * 0.145, 0.03, 0);
+  hipTie.rotation.y = Math.PI / 2;
+  bottoms.add(hipTie);
+  const end = sphere(0.015, bikiniMat, 8, 8);
+  end.position.set(side * 0.18, 0.0, 0.02);
+  bottoms.add(end);
 });
 
-// Head
-const neck = limb(0.045, 0.05, 0.1);
-neck.position.y = 0.34;
+/* Neck + head */
+const neck = cyl(0.042, 0.048, 0.11);
+neck.position.y = 0.36;
 torso.add(neck);
 
 const head = new THREE.Group();
-head.position.y = 0.48;
+head.position.y = 0.5;
 torso.add(head);
 
-const skull = ball(0.13, skinMat, 24);
-skull.scale.set(0.95, 1.05, 0.95);
+const skull = sphere(0.128, skinMat, 28, 22);
+skull.scale.set(0.95, 1.08, 0.95);
 head.add(skull);
 
-// Face features (subtle)
-const nose = ball(0.02);
-nose.position.set(0, 0, 0.12);
-nose.scale.set(0.7, 1.1, 0.9);
+const jaw = sphere(0.09, skinMat, 16, 12);
+jaw.position.set(0, -0.06, 0.02);
+jaw.scale.set(0.95, 0.7, 0.9);
+head.add(jaw);
+
+const nose = sphere(0.018);
+nose.position.set(0, 0.01, 0.125);
+nose.scale.set(0.65, 1.15, 0.95);
 head.add(nose);
 
-const eyeGeo = new THREE.SphereGeometry(0.018, 10, 10);
-const eyeMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.3 });
-const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-eyeL.position.set(-0.045, 0.025, 0.105);
-head.add(eyeL);
-const eyeR = eyeL.clone();
-eyeR.position.x = 0.045;
-head.add(eyeR);
+function makeEye(side) {
+  const g = new THREE.Group();
+  g.position.set(side * 0.045, 0.03, 0.108);
+  const white = sphere(0.018, eyeWhite, 10, 8);
+  white.scale.set(1.1, 0.85, 0.6);
+  g.add(white);
+  const iris = sphere(0.01, irisMat, 8, 8);
+  iris.position.z = 0.01;
+  g.add(iris);
+  return g;
+}
+head.add(makeEye(-1), makeEye(1));
 
-const lipMat = new THREE.MeshStandardMaterial({ color: 0xc47a72, roughness: 0.45 });
-const lips = ball(0.025, lipMat, 10);
-lips.scale.set(1.4, 0.45, 0.7);
-lips.position.set(0, -0.04, 0.11);
+const lips = sphere(0.024, lipMat, 10, 8);
+lips.scale.set(1.45, 0.4, 0.65);
+lips.position.set(0, -0.045, 0.115);
 head.add(lips);
 
-// Hair
-const hairCap = ball(0.14, hairMat, 20);
-hairCap.scale.set(1.05, 1.0, 1.1);
-hairCap.position.set(0, 0.02, -0.01);
-head.add(hairCap);
+/* Blonde shoulder-length hair */
+const hairRoot = new THREE.Group();
+head.add(hairRoot);
 
-const hairBack = ball(0.16, hairMat, 16);
-hairBack.scale.set(1.1, 1.35, 0.7);
-hairBack.position.set(0, -0.08, -0.1);
-head.add(hairBack);
+const hairCap = sphere(0.14, hairMat, 22, 18);
+hairCap.scale.set(1.08, 1.02, 1.12);
+hairCap.position.set(0, 0.025, -0.015);
+hairRoot.add(hairCap);
+
+const fringe = sphere(0.075, hairLite, 14, 10);
+fringe.scale.set(1.55, 0.45, 0.55);
+fringe.position.set(0, 0.09, 0.1);
+hairRoot.add(fringe);
+
+const hairBack = sphere(0.155, hairMat, 16, 14);
+hairBack.scale.set(1.15, 1.5, 0.75);
+hairBack.position.set(0, -0.1, -0.1);
+hairRoot.add(hairBack);
 
 [-1, 1].forEach((side) => {
-  const strand = ball(0.07, hairMat, 12);
-  strand.scale.set(0.7, 1.8, 0.6);
-  strand.position.set(side * 0.12, -0.12, -0.02);
-  strand.rotation.z = side * 0.2;
-  head.add(strand);
+  const lock = sphere(0.075, side > 0 ? hairLite : hairMat, 12, 10);
+  lock.scale.set(0.75, 2.0, 0.65);
+  lock.position.set(side * 0.125, -0.14, 0.0);
+  lock.rotation.z = side * 0.18;
+  hairRoot.add(lock);
+
+  const lower = sphere(0.055, hairMat, 10, 8);
+  lower.scale.set(0.7, 1.6, 0.55);
+  lower.position.set(side * 0.11, -0.28, -0.02);
+  lower.rotation.z = side * 0.12;
+  hairRoot.add(lower);
 });
 
-const bang = ball(0.08, hairMat, 12);
-bang.scale.set(1.4, 0.5, 0.5);
-bang.position.set(0, 0.08, 0.1);
-head.add(bang);
+const ponytailHint = sphere(0.07, hairLite, 12, 10);
+ponytailHint.scale.set(1.0, 1.3, 0.7);
+ponytailHint.position.set(0, -0.22, -0.14);
+hairRoot.add(ponytailHint);
 
-// Arms
+/* Arms */
 function makeArm(side) {
   const arm = new THREE.Group();
-  arm.position.set(side * 0.2, 0.18, 0);
+  arm.position.set(side * 0.22, 0.2, 0);
   torso.add(arm);
 
-  const upper = limb(0.045, 0.04, 0.28);
-  upper.position.y = -0.12;
+  const upper = cyl(0.048, 0.042, 0.3);
+  upper.position.y = -0.13;
   arm.add(upper);
 
   const elbow = new THREE.Group();
-  elbow.position.y = -0.28;
+  elbow.position.y = -0.3;
   arm.add(elbow);
 
-  const lower = limb(0.038, 0.032, 0.26);
-  lower.position.y = -0.13;
+  const lower = cyl(0.04, 0.032, 0.27);
+  lower.position.y = -0.135;
   elbow.add(lower);
 
-  const hand = ball(0.038);
-  hand.position.y = -0.28;
-  hand.scale.set(0.9, 1.1, 0.7);
+  const hand = sphere(0.04);
+  hand.scale.set(0.85, 1.15, 0.65);
+  hand.position.y = -0.29;
   elbow.add(hand);
 
-  // Bracelet / watch
-  const band = new THREE.Mesh(
-    new THREE.TorusGeometry(0.038, 0.008, 6, 16),
+  const band = mesh(
+    new THREE.TorusGeometry(0.036, 0.007, 6, 14),
     new THREE.MeshStandardMaterial({
-      color: side > 0 ? 0x1e3a5f : 0xc0c0c0,
-      roughness: 0.4,
-      metalness: side > 0 ? 0.1 : 0.7,
+      color: side > 0 ? 0x1a3355 : 0xd0d0d0,
+      roughness: 0.35,
+      metalness: side > 0 ? 0.15 : 0.75,
     })
   );
-  band.position.y = -0.22;
   band.rotation.x = Math.PI / 2;
+  band.position.y = -0.22;
   elbow.add(band);
 
-  arm.userData = { elbow, upper, hand };
+  arm.userData = { elbow };
   return arm;
 }
 
 const armL = makeArm(-1);
 const armR = makeArm(1);
 
-// Legs
+/* Legs */
 function makeLeg(side) {
   const leg = new THREE.Group();
-  leg.position.set(side * 0.09, -0.05, 0);
+  leg.position.set(side * 0.095, -0.04, 0);
   hips.add(leg);
 
-  const thigh = limb(0.07, 0.055, 0.38);
-  thigh.position.y = -0.2;
+  const thigh = cyl(0.075, 0.058, 0.4);
+  thigh.position.y = -0.21;
   leg.add(thigh);
 
   const knee = new THREE.Group();
-  knee.position.y = -0.42;
+  knee.position.y = -0.44;
   leg.add(knee);
 
-  const shin = limb(0.05, 0.04, 0.36);
-  shin.position.y = -0.18;
+  const shin = cyl(0.052, 0.04, 0.38);
+  shin.position.y = -0.19;
   knee.add(shin);
 
-  const foot = ball(0.05);
-  foot.scale.set(0.75, 0.45, 1.4);
-  foot.position.set(0, -0.38, 0.04);
+  const ankle = sphere(0.04, skinDeep, 10, 8);
+  ankle.position.y = -0.38;
+  knee.add(ankle);
+
+  const foot = sphere(0.048);
+  foot.scale.set(0.7, 0.4, 1.45);
+  foot.position.set(0, -0.4, 0.05);
   knee.add(foot);
 
-  leg.userData = { knee, thigh, foot };
+  leg.userData = { knee };
   return leg;
 }
 
 const legL = makeLeg(-1);
 const legR = makeLeg(1);
 
-// Pose helpers
+/* Poses matching photo set */
 const poses = {
   stand() {
-    hips.rotation.set(0, 0.15, 0);
-    torso.rotation.set(0.05, 0.1, 0);
-    head.rotation.set(-0.05, 0.35, 0);
-    armL.rotation.set(0.15, 0, 0.25);
-    armL.userData.elbow.rotation.set(-0.2, 0, 0);
-    armR.rotation.set(0.1, 0, -0.2);
-    armR.userData.elbow.rotation.set(-0.15, 0, 0);
-    legL.rotation.set(0.05, 0, 0.04);
-    legL.userData.knee.rotation.set(0.05, 0, 0);
-    legR.rotation.set(-0.05, 0, -0.03);
-    legR.userData.knee.rotation.set(0.08, 0, 0);
-    character.position.y = 0;
+    hips.rotation.set(0, 0.2, 0);
+    torso.rotation.set(0.04, 0.12, 0);
+    head.rotation.set(-0.05, 0.45, 0.05);
+    armL.rotation.set(0.12, 0, 0.28);
+    armL.userData.elbow.rotation.set(-0.18, 0, 0);
+    armR.rotation.set(-0.9, 0.1, -0.35);
+    armR.userData.elbow.rotation.set(-1.0, 0.2, 0);
+    legL.rotation.set(0.06, 0.05, 0.04);
+    legL.userData.knee.rotation.set(0.06, 0, 0);
+    legR.rotation.set(-0.08, -0.04, -0.03);
+    legR.userData.knee.rotation.set(0.1, 0, 0);
+    character.position.set(0, 0, 0);
+    hairRoot.rotation.set(0, 0.1, 0);
   },
   look() {
-    hips.rotation.set(0, -0.4, 0);
-    torso.rotation.set(0.08, -0.2, 0.05);
-    head.rotation.set(-0.1, -0.5, 0);
-    armR.rotation.set(-1.9, 0.2, -0.4);
-    armR.userData.elbow.rotation.set(-1.2, 0, 0);
-    armL.rotation.set(0.2, 0, 0.35);
-    armL.userData.elbow.rotation.set(-0.25, 0, 0);
-    legL.rotation.set(0.1, 0.1, 0.05);
-    legL.userData.knee.rotation.set(0.1, 0, 0);
-    legR.rotation.set(-0.15, -0.05, -0.05);
-    legR.userData.knee.rotation.set(0.2, 0, 0);
-    character.position.y = 0;
+    hips.rotation.set(0, -0.55, 0);
+    torso.rotation.set(0.06, -0.25, 0.04);
+    head.rotation.set(-0.12, -0.35, 0);
+    armR.rotation.set(-2.05, 0.35, -0.55);
+    armR.userData.elbow.rotation.set(-0.9, 0, 0.2);
+    armL.rotation.set(0.15, 0, 0.4);
+    armL.userData.elbow.rotation.set(-0.2, 0, 0);
+    legL.rotation.set(0.12, 0.12, 0.06);
+    legL.userData.knee.rotation.set(0.08, 0, 0);
+    legR.rotation.set(-0.2, -0.08, -0.05);
+    legR.userData.knee.rotation.set(0.22, 0, 0);
+    character.position.set(0, 0, 0);
+    hairRoot.rotation.set(0, -0.15, 0.05);
   },
   sit() {
-    hips.rotation.set(0.15, 0.3, 0);
-    torso.rotation.set(0.2, 0.15, 0);
-    head.rotation.set(-0.15, 0.6, 0);
-    armL.rotation.set(-0.6, 0.2, 0.5);
-    armL.userData.elbow.rotation.set(-1.1, 0, 0);
-    armR.rotation.set(-0.55, -0.15, -0.45);
-    armR.userData.elbow.rotation.set(-1.0, 0, 0);
-    legL.rotation.set(-1.35, 0.15, 0.1);
-    legL.userData.knee.rotation.set(1.55, 0, 0);
-    legR.rotation.set(-1.25, -0.1, -0.08);
-    legR.userData.knee.rotation.set(1.45, 0, 0);
-    character.position.y = -0.35;
+    hips.rotation.set(0.2, 0.35, 0);
+    torso.rotation.set(0.25, 0.2, 0);
+    head.rotation.set(-0.2, 0.7, 0);
+    armL.rotation.set(-0.7, 0.25, 0.55);
+    armL.userData.elbow.rotation.set(-1.15, 0, 0);
+    armR.rotation.set(-0.65, -0.2, -0.5);
+    armR.userData.elbow.rotation.set(-1.05, 0, 0);
+    legL.rotation.set(-1.4, 0.2, 0.12);
+    legL.userData.knee.rotation.set(1.6, 0, 0);
+    legR.rotation.set(-1.3, -0.12, -0.1);
+    legR.userData.knee.rotation.set(1.5, 0, 0);
+    character.position.set(0, -0.38, 0);
+    hairRoot.rotation.set(0.05, 0.2, 0);
   },
 };
 
+let currentPose = "stand";
 poses.stand();
 
-// Gentle idle sway
-let t = 0;
-let currentPose = "stand";
-
-function animateIdle(dt) {
-  t += dt;
-  const sway = Math.sin(t * 1.2) * 0.015;
-  if (currentPose !== "sit") {
-    torso.rotation.z = sway;
-    hairCap.rotation.y = Math.sin(t * 0.8) * 0.04;
-  }
-  // Water shimmer motion
-  const pos = water.geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    pos.setZ(i, Math.sin(x * 0.35 + t * 1.5) * 0.05 + Math.cos(y * 0.25 + t) * 0.04);
-  }
-  pos.needsUpdate = true;
-  water.geometry.computeVertexNormals();
-}
-
-// Sparkle pulse
-const sparkles = [];
-torso.traverse((obj) => {
-  if (obj.material === sparkleMat) sparkles.push(obj);
-});
-
-// UI: poses
+/* UI */
 document.querySelectorAll("[data-pose]").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("[data-pose]").forEach((b) => b.classList.remove("active"));
@@ -501,68 +479,75 @@ autoBtn.addEventListener("click", () => {
 });
 
 document.getElementById("resetCam").addEventListener("click", () => {
-  camera.position.set(2.4, 1.55, 4.2);
-  controls.target.set(0, 1.05, 0);
-  controls.update();
+  camera.position.set(0.35, 1.45, 4.4);
+  controls.target.set(0, 1.1, 0);
 });
 
-// Reference thumbnails (optional local refs)
 const refFiles = [
-  { src: "./refs/front.jpg", label: "Front" },
-  { src: "./refs/profile.jpg", label: "Profil" },
-  { src: "./refs/side.jpg", label: "Bok" },
-  { src: "./refs/front-hat.jpg", label: "Klobouk" },
+  { src: "./refs/front.jpg", cam: [0.2, 1.5, 4.2] },
+  { src: "./refs/profile.jpg", cam: [-3.6, 1.55, 0.4] },
+  { src: "./refs/side.jpg", cam: [3.4, 1.4, 1.0] },
+  { src: "./refs/front-hat.jpg", cam: [0.15, 1.65, 3.8] },
 ];
 
 refFiles.forEach((ref, i) => {
   const img = document.createElement("img");
   img.src = ref.src;
-  img.alt = ref.label;
-  img.title = ref.label;
+  img.alt = `Ref ${i + 1}`;
   img.loading = "lazy";
   img.addEventListener("error", () => img.remove());
   img.addEventListener("click", () => {
     refsEl.querySelectorAll("img").forEach((el) => el.classList.remove("active"));
     img.classList.add("active");
-    // Nudge camera to complementary angle
-    const angles = [
-      new THREE.Vector3(0.3, 1.5, 4.0),
-      new THREE.Vector3(-3.5, 1.6, 0.5),
-      new THREE.Vector3(3.2, 1.4, 1.2),
-      new THREE.Vector3(0.2, 1.7, 3.6),
-    ];
-    camera.position.copy(angles[i]);
-    controls.target.set(0, 1.1, 0);
+    camera.position.set(...ref.cam);
+    controls.target.set(0, 1.15, 0);
   });
   refsEl.appendChild(img);
 });
 
-// Resize
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
 
-// Intro camera ease
+/* Animation */
+let t = 0;
 let intro = 0;
-const introFrom = new THREE.Vector3(0.5, 2.8, 7.5);
+const introFrom = new THREE.Vector3(1.2, 2.6, 7.2);
 const introTo = camera.position.clone();
 camera.position.copy(introFrom);
 
 const clock = new THREE.Clock();
+const waterPos = water.geometry.attributes.position;
 
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
+  t += dt;
+
   if (intro < 1) {
-    intro = Math.min(1, intro + dt * 0.45);
-    const e = 1 - Math.pow(1 - intro, 3);
+    intro = Math.min(1, intro + dt * 0.5);
+    const e = 1 - (1 - intro) ** 3;
     camera.position.lerpVectors(introFrom, introTo, e);
   }
-  animateIdle(dt);
+
+  if (currentPose !== "sit") {
+    torso.rotation.z = Math.sin(t * 1.15) * 0.012;
+    hairRoot.rotation.y += (Math.sin(t * 0.7) * 0.04 - hairRoot.rotation.y) * 0.05;
+  }
+
+  for (let i = 0; i < waterPos.count; i++) {
+    const x = waterPos.getX(i);
+    const y = waterPos.getY(i);
+    waterPos.setZ(i, Math.sin(x * 0.3 + t * 1.4) * 0.045 + Math.cos(y * 0.22 + t * 0.9) * 0.035);
+  }
+  waterPos.needsUpdate = true;
+  water.geometry.computeVertexNormals();
+
   sparkles.forEach((s, i) => {
-    s.material.emissiveIntensity = 0.1 + 0.15 * (0.5 + 0.5 * Math.sin(t * 3 + i));
+    s.material.emissiveIntensity = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(t * 3.2 + i));
   });
+
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
